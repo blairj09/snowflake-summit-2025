@@ -1,0 +1,363 @@
+---
+title: "Air Quality EDA"
+format: html
+---
+
+```{python}
+import polars as pl
+import plotly.express as px
+import plotly.graph_objects as go
+```
+
+This document explores the Air Quality dataset available through the Snowflake Marketplace. It also creates a local data extract for PoC purposes.
+## EDA
+Connect to data, either directly via Snowflake or using a local data extract
+```{python}
+SNOWFLAKE = False
+if SNOWFLAKE:
+    import snowflake.connector
+    conn = snowflake.connector.connect()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM AIR_QUALITY_DATA_UNITED_STATES.PUBLIC.AIR_QUALITY")
+    df = cur.fetch_pandas_all()
+    df.to_csv("dashboard/data/air_quality.csv")
+else:
+    import polars as pl
+    df = pl.read_csv("dashboard/data/air_quality.csv", infer_schema_length=300000)
+```
+
+What unique values of SAMPLEDURATION exist in the data?
+```{python}
+df.group_by('SAMPLEDURATION').agg(pl.len()).sort('len', descending=True)
+```
+
+Filter for only 24 hour metrics since those are the most prevelant in the data
+```{python}
+df_24hr = df.filter(pl.col('SAMPLEDURATION') == '24 HOUR')
+print(f"Number of 24-hour samples: {len(df_24hr)}")
+df_24hr.head()
+```
+
+Analyze parameter names and metrics used in 24-hour samples
+```{python}
+# Count unique combinations of parameter names and metrics
+print("Parameter Names and Metrics Combinations (count > 100):")
+df_24hr.group_by(['PARAMETERNAME', 'METRICUSED']).agg(pl.len())\
+    .filter(pl.col('len') > 100)\
+    .sort(['PARAMETERNAME', 'len'], descending=[False, True])\
+    .group_by('METRICUSED').agg(pl.len())
+```
+
+Based on this we want to filter to only 24 hour measurements of "Observed Values"
+
+```{python}
+# Filter for 24 hour measurements with Observed Values metric
+df_24hr_obs = df_24hr.filter(pl.col('METRICUSED') == 'Observed Values')
+print(f"Number of 24-hour observed value samples: {len(df_24hr_obs)}")
+df_24hr_obs.head()
+```
+
+What years do we have in the filtered data?
+```{python}
+df_24hr_obs.group_by('YEAR').agg(pl.len()).sort('YEAR')
+```
+1980 - 2000
+
+What locations do we have in the data?
+```{python}
+import matplotlib.pyplot as plt
+
+# Get unique lat/lon combinations
+unique_locations = df_24hr.select(['LATITUDE', 'LONGITUDE']).unique()
+
+# Create the plot
+plt.figure(figsize=(15, 10))
+plt.scatter(unique_locations['LONGITUDE'], unique_locations['LATITUDE'], 
+           alpha=0.5, s=20)
+
+# Customize the plot
+plt.title('Air Quality Monitoring Locations')
+plt.xlabel('Longitude')
+plt.ylabel('Latitude')
+
+# Add a basic map background (continental US bounds)
+plt.xlim(-130, -65)
+plt.ylim(25, 50)
+plt.grid(True, linestyle='--', alpha=0.6)
+
+plt.show()
+```
+
+How many observations are there for each State in the filtered data?
+```{python}
+df_24hr_obs.group_by('STATENAME').agg(pl.len()).sort('len')
+```
+
+What metrics are in the filtered data?
+```{python}
+# Get parameters with more than 1000 observations
+parameters_1000plus = df_24hr_obs.group_by('PARAMETERNAME').agg(pl.len())\
+    .sort('len', descending=True)\
+    .filter(pl.col('len') > 1000)\
+    .get_column('PARAMETERNAME')
+
+# Create new filtered dataset with only these parameters
+df_24hr_obs_filtered = df_24hr_obs.filter(pl.col('PARAMETERNAME').is_in(parameters_1000plus))
+print(f"Number of observations in filtered dataset: {len(df_24hr_obs_filtered)}")
+print("\nParameters included:")
+df_24hr_obs_filtered.group_by('PARAMETERNAME').agg(pl.len()).sort('len', descending=True)
+```
+
+Map Suspended particulate (TSP) across states
+```{python}
+import plotly.express as px
+
+# Plotly matches data to states based on State name abbreviations
+state_abbreviations = {
+    'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 
+    'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
+    'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
+    'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
+    'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+    'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
+    'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+    'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+    'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
+    'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+    'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
+    'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+    'Wisconsin': 'WI', 'Wyoming': 'WY', 'District Of Columbia': 'DC'
+}
+
+# Calculate average TSP by state
+tsp_by_state = df_24hr_obs_filtered\
+    .filter(pl.col('PARAMETERNAME') == 'Suspended particulate (TSP)')\
+    .group_by('STATENAME')\
+    .agg(pl.col('ARITHMETICMEAN').mean())\
+    .sort('ARITHMETICMEAN', descending=True)\
+    .with_columns(
+        pl.col('STATENAME').replace(state_abbreviations).alias('STATEABB')
+    )
+
+# Create the choropleth map
+fig = px.choropleth(tsp_by_state,
+    locations='STATEABB',
+    locationmode='USA-states',
+    color='ARITHMETICMEAN',
+    scope='usa',
+    color_continuous_scale='Viridis',
+    title='Average Suspended Particulate (TSP) by State',
+    labels={'ARITHMETICMEAN': 'Average TSP'}
+)
+
+# Update the layout
+fig.update_layout(
+    title_x=0.5,
+    geo_scope='usa',
+)
+
+fig.show()
+```
+
+Compare average TSP for 2 different states over time
+```{python}
+# Create time series plot for Alabama vs Utah TSP
+# First filter and prepare the data
+tsp_by_state_year = df_24hr_obs_filtered\
+    .filter(pl.col('PARAMETERNAME') == 'Suspended particulate (TSP)')\
+    .filter(pl.col('STATENAME').is_in(['Alabama', 'Utah']))\
+    .group_by(['STATENAME', 'YEAR'])\
+    .agg(pl.col('ARITHMETICMEAN').mean())\
+    .sort(['STATENAME', 'YEAR'])
+
+# Create the line plot using plotly
+fig = px.line(tsp_by_state_year,
+    x='YEAR',
+    y='ARITHMETICMEAN',
+    color='STATENAME',
+    title='Average Suspended Particulate (TSP) Trends: Alabama vs Utah (1980-2000)',
+    labels={
+        'YEAR': 'Year',
+        'ARITHMETICMEAN': 'Average TSP',
+        'STATENAME': 'State'
+    }
+)
+
+# Update the layout
+fig.update_layout(
+    title_x=0.5,
+    xaxis_title='Year',
+    yaxis_title='Average TSP',
+    legend_title='State'
+)
+
+fig.show()
+```
+
+Boxplot of Utah TSP measurements by year
+```{python}
+# Create box plot for Utah TSP measurements
+utah_tsp = df_24hr_obs_filtered\
+    .filter(pl.col('PARAMETERNAME') == 'Suspended particulate (TSP)')\
+    .filter(pl.col('STATENAME') == 'Utah')\
+    .select(['YEAR', 'ARITHMETICMEAN'])
+
+# Create the box plot using plotly
+fig = px.box(utah_tsp,
+    x='YEAR',
+    y='ARITHMETICMEAN',
+    title='Distribution of TSP Measurements in Utah (1980-2000)',
+    labels={
+        'YEAR': 'Year',
+        'ARITHMETICMEAN': 'TSP Measurement'
+    }
+)
+
+# Update the layout
+fig.update_layout(
+    title_x=0.5,
+    xaxis_title='Year',
+    yaxis_title='TSP Measurement',
+    showlegend=False
+)
+
+fig.show()
+```
+
+## Final Data Filter and Sample
+What is the final data that we should build the dashboard on? This will help define the data dictionary that's used to provide context to `querychat`.
+
+Columns that we want to keep are:
+- Latitude
+- Longitude
+- Parametername
+- Year
+- Arithmeticmean
+- 90thpercentile
+- 50thpercentile
+- 10thpercentile
+- Address
+- Statename
+- Countyname
+- Cityname
+
+```{python}
+# Create final filtered dataset with selected columns
+final_df = df_24hr_obs_filtered.select([
+    'LATITUDE',
+    'LONGITUDE',
+    'PARAMETERNAME',
+    'YEAR',
+    'ARITHMETICMEAN',
+    '90THPERCENTILE',
+    '50THPERCENTILE',
+    '10THPERCENTILE',
+    'ADDRESS',
+    'STATENAME',
+    'COUNTYNAME',
+    'CITYNAME'
+])
+
+print(f"Final dataset shape: {final_df.shape}")
+final_df.head()
+```
+
+Sample 5k rows for local extract. This improves local iteration and makes it easier to upload sample data to GitHub.
+```{python}
+# Sample 5000 rows randomly from final_df
+sample_df = final_df.sample(n=5000, shuffle=True)
+print(f"Sample dataset shape: {sample_df.shape}")
+sample_df.head()
+```
+
+```{python}
+# Write final filtered dataset to CSV
+final_df.write_csv("dashboard/data/air_quality_final.csv")
+print("Final dataset written to air_quality_final.csv")
+
+# Write sampled dataset to CSV
+sample_df.write_csv("dashboard/data/air_quality_sample.csv")
+print("Sample dataset writtin to air_quality_sample.csv")
+```
+
+## Dashboard visualizations
+An exploration of possible visualizations to include in the final dashboard
+
+```{python}
+# Calculate average TSP by state from final_df
+tsp_state_avg = final_df\
+    .filter(pl.col('PARAMETERNAME') == 'Suspended particulate (TSP)')\
+    .group_by('STATENAME')\
+    .agg(pl.col('ARITHMETICMEAN').mean())\
+    .sort('ARITHMETICMEAN', descending=True)\
+    .with_columns(
+        pl.col('STATENAME').replace(state_abbreviations).alias('STATEABB')
+    )
+
+# Create interactive choropleth map
+fig = px.choropleth(
+    tsp_state_avg,
+    locations='STATEABB',
+    locationmode='USA-states',
+    color='ARITHMETICMEAN',
+    scope='usa',
+    color_continuous_scale='Viridis',
+    title='Average Suspended Particulate (TSP) Levels by State (1980-2000)',
+    labels={'ARITHMETICMEAN': 'Average TSP (μg/m³)'}
+)
+
+# Customize the layout
+fig.update_layout(
+    title_x=0.5,
+    geo_scope='usa',
+    geo=dict(showlakes=True, lakecolor='rgb(255, 255, 255)'),
+    margin=dict(l=0, r=0, t=30, b=0)
+)
+
+fig.show()
+```
+
+
+```{python}
+# Create time series plot for all states' TSP values
+tsp_all_states_year = final_df\
+    .filter(pl.col('PARAMETERNAME') == 'Suspended particulate (TSP)')\
+    .group_by(['STATENAME', 'YEAR'])\
+    .agg(pl.col('ARITHMETICMEAN').mean())\
+    .sort(['STATENAME', 'YEAR'])
+
+# Create the line plot using plotly
+fig = px.line(tsp_all_states_year,
+    x='YEAR',
+    y='ARITHMETICMEAN',
+    color='STATENAME',
+    title='Average Suspended Particulate (TSP) Trends by State (1980-2000)',
+    labels={
+        'YEAR': 'Year',
+        'ARITHMETICMEAN': 'Average TSP (μg/m³)',
+        'STATENAME': 'State'
+    }
+)
+
+# Customize the layout
+fig.update_layout(
+    title_x=0.5,
+    xaxis_title='Year',
+    yaxis_title='Average TSP (μg/m³)',
+    legend_title='State',
+    # Make the plot more compact and readable
+    height=600,
+    showlegend=True,
+    legend=dict(
+        yanchor="top",
+        y=0.99,
+        xanchor="left",
+        x=1.02
+    ),
+    # Add hover template
+    hovermode='x unified'
+)
+
+# Show the plot
+fig.show()
+```

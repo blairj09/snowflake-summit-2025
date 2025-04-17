@@ -1,0 +1,71 @@
+---
+title: "Next Gen Data Science"
+format: html
+jupyter: .venv/bin/python
+---
+
+# Data Connection
+## ODBC with R
+```{r}
+library(tidyverse)
+```
+
+Connect to data in Snowflake
+
+```{r}
+con <- DBI::dbConnect(
+    odbc::snowflake(),
+    warehouse = "DEFAULT_WH"
+)
+```
+
+## Snowflake Python Connector
+Interactive Snowflake queries from Python
+```{python}
+import snowflake.connector
+conn = snowflake.connector.connect()
+cur = conn.cursor()
+cur.execute('select * from AIR_QUALITY_DATA_UNITED_STATES.PUBLIC.AIR_QUALITY limit 10')
+df = cur.fetch_pandas_all()
+df
+```
+
+Grab all data from the table locally for the time being
+
+```{python}
+cur.execute("SELECT * FROM AIR_QUALITY_DATA_UNITED_STATES.PUBLIC.AIR_QUALITY")
+df = cur.fetch_pandas_all()
+```
+
+# Gen AI
+## Elmer
+
+```{r}
+library(ellmer)
+```
+
+## Chatlas
+Anthropic
+```{python}
+from chatlas import ChatAnthropic
+chat = ChatAnthropic()
+```
+
+```{python}
+chat.console()
+```
+
+Snowflake
+
+```{python}
+from chatlas import ChatSnowflake
+chat = ChatSnowflake(
+    model = "claude-3-5-sonnet"
+)
+```
+
+```{python}
+chat.console()
+```
+
+
