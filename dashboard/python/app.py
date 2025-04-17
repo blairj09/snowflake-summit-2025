@@ -128,8 +128,8 @@ def server(input, output, session):
             color='ARITHMETICMEAN',
             scope='usa',
             color_continuous_scale='Viridis',
-            title='Average Suspended Particulate (TSP) Levels by State (1980-2000)',
-            labels={'ARITHMETICMEAN': 'Average TSP (μg/m³)'}
+            title='Average Metric Levels by State',
+            labels={'ARITHMETICMEAN': 'Average Metric'}
         )
 
         return map_output
@@ -145,10 +145,10 @@ def server(input, output, session):
             x='YEAR',
             y='ARITHMETICMEAN',
             color='STATENAME',
-            title='Average Suspended Particulate (TSP) Trends by State (1980-2000)',
+            title='Average Metric Trends by State',
             labels={
                 'YEAR': 'Year',
-                'ARITHMETICMEAN': 'Average TSP (μg/m³)',
+                'ARITHMETICMEAN': 'Average Metric',
                 'STATENAME': 'State'
             }
         ).update_layout(
@@ -161,9 +161,8 @@ def server(input, output, session):
     def plot_hist():
         hist_output = px.histogram(
             data_frame = chat["df"](),
-            x = "ARITHMETICMEAN"
-        ).update_layout(
-            title = "Histogram"
+            x = "ARITHMETICMEAN",
+            title = "Metric Distribution"
         )
 
         return hist_output
