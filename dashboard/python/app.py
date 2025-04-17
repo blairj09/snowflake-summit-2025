@@ -14,7 +14,7 @@ if SNOWFLAKE:
     cur.execute('select * from AIR_QUALITY_DATA_UNITED_STATES.PUBLIC.AIR_QUALITY')
     df = cur.fetch_pandas_all()
 else:
-    df = pl.read_csv("dashboard/data/air_quality_sample.csv")
+    df = pl.read_csv("data/air_quality_sample.csv")
 
 # querychat config ----
 with open(Path(__file__).parent / "greeting.md", "r") as f:
