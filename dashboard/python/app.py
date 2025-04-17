@@ -1,14 +1,19 @@
-import chatlas, querychat, snowflake.connector
+import chatlas, querychat, snowflake.connector, os
 import polars as pl
 import plotly.express as px
 
 from pathlib import Path
 from shiny import App, render, ui
 from shinywidgets import output_widget, render_widget
+from dotenv import load_dotenv
+from distutils.util import strtobool
+
+load_dotenv()
 
 # Dataset - Snowflake Air Quality Data ----
-SNOWFLAKE = False
-if SNOWFLAKE:
+
+snowflake_enabled = bool(strtobool(os.getenv('SNOWFLAKE', 'False')))
+if snowflake_enabled:
     conn = snowflake.connector.connect()
     cur = conn.cursor()
     cur.execute('select * from AIR_QUALITY_DATA_UNITED_STATES.PUBLIC.AIR_QUALITY')
