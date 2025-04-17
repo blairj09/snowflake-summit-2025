@@ -7,7 +7,9 @@ This project analyzes historical air quality data across United States avaialabl
   - The result of a chat interaction is SQL that is executed against a Snowflake table to filter the data based on the natural language query
   - The dashboard updates to reflect the filtered data
 
-This sort of workflow enables natural language interaction with data **without** requiring a foundational LLM to interpret raw data. Instead, the LLM is only used for creating SQL to respond to filtering and aggregation reguests. The SQL is auditable and, most importantly, does not require the LLM to be exposed to any of the actual data. Once the data has been filtered, the rest of the dashboard reflects the filtered data. Effectively, many UI controls can be replaced with a single chat panel. 
+This sort of workflow enables natural language interaction with data **without** requiring a foundational LLM to interpret raw data. Instead, the LLM is only used for creating SQL to respond to filtering and aggregation reguests. The SQL is auditable and, most importantly, does not require the LLM to be exposed to any of the actual data. Once the data has been filtered, the rest of the dashboard reflects the filtered data. Effectively, many UI controls can be replaced with a single chat panel.
+
+![](img/dashboard-screenshot.png)
 
 **In this specific example, both the underlying LLM and the SQL execution are powered by Snowflake.**
 
