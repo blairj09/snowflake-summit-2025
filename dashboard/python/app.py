@@ -86,15 +86,20 @@ app_ui = ui.page_sidebar(
     ui.layout_columns(
         # Row 1
         ui.card(
+            ui.output_text("filtered_metric"),
+            fill = True
+        ),
+        # Row 2
+        ui.card(
             output_widget("plot_map"),
             fill=True
         ),
-        # Row 2
+        # Row 3
         ui.card(
             output_widget("plot_line"),
             fill=True
         ),
-        # Row 3
+        # Row 4
         ui.card(
             output_widget("plot_hist"),
             fill=True
@@ -103,7 +108,7 @@ app_ui = ui.page_sidebar(
             output_widget("plot_scatter"),
             fill=True
         ),
-        # Row 4
+        # Row 5
         ui.card(
             ui.output_data_frame("data_table"),
             fill=True
@@ -125,11 +130,15 @@ def server(input, output, session):
     def df():
         return pl.from_dataframe(chat["df"]())
 
+    @reactive.calc
     def filter_name():
         # We choose only the first value, assuming all values are the same.
         # This assumption is accurate except for when the application is first initialized
         return df().select("PARAMETERNAME").row(0)[0]
 
+    @render.text
+    def filtered_metric():
+        return f"Applied Filter: {filter_name()}"
 
     @render_widget
     def plot_map():
@@ -157,7 +166,8 @@ def server(input, output, session):
     def plot_line():
         data = df()\
             .group_by(["STATENAME", "YEAR"])\
-            .agg(pl.col("ARITHMETICMEAN").mean())
+            .agg(pl.col("ARITHMETICMEAN").mean())\
+            .sort(['STATENAME', 'YEAR'])
 
         line_output = px.line(
             data,
