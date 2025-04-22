@@ -157,7 +157,7 @@ def server(input, output, session):
             scope='usa',
             color_continuous_scale='Viridis',
             title=f'Average {filter_name()} Levels by State',
-            labels={'ARITHMETICMEAN': 'Average Metric'}
+            labels={'ARITHMETICMEAN': ''}
         )
 
         return map_output
