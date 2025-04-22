@@ -7,14 +7,18 @@ format: html
 import polars as pl
 import plotly.express as px
 import plotly.graph_objects as go
+from distutils.util import strtobool
+from dotenv import load_dotenv
+
+load_dotenv()
 ```
 
 This document explores the Air Quality dataset available through the Snowflake Marketplace. It also creates a local data extract for PoC purposes.
 ## EDA
 Connect to data, either directly via Snowflake or using a local data extract
 ```{python}
-SNOWFLAKE = False
-if SNOWFLAKE:
+snowflake_enabled = bool(strtobool(os.getenv('SNOWFLAKE', 'False')))
+if snowflake_enabled:
     import snowflake.connector
     conn = snowflake.connector.connect()
     cur = conn.cursor()
@@ -23,7 +27,7 @@ if SNOWFLAKE:
     df.to_csv("dashboard/data/air_quality.csv")
 else:
     import polars as pl
-    df = pl.read_csv("dashboard/data/air_quality.csv", infer_schema_length=300000)
+    df = pl.read_csv("dashboard/python/data/air_quality.csv", infer_schema_length=300000)
 ```
 
 What unique values of SAMPLEDURATION exist in the data?
@@ -264,19 +268,54 @@ final_df.head()
 
 Sample 5k rows for local extract. This improves local iteration and makes it easier to upload sample data to GitHub.
 ```{python}
-# Sample 5000 rows randomly from final_df
-sample_df = final_df.sample(n=5000, shuffle=True)
+# Sample 5000 rows randomly from final_df with fixed seed for reproducibility
+sample_df = final_df.sample(n=5000, shuffle=True, seed=42)
 print(f"Sample dataset shape: {sample_df.shape}")
 sample_df.head()
 ```
 
+Check line plot for TSP
+
+```{python}
+# Create time series plot for Alabama vs Utah TSP using sample data
+sample_tsp_by_state_year = sample_df\
+    .filter(pl.col('PARAMETERNAME') == 'Suspended particulate (TSP)')\
+    .filter(pl.col('STATENAME').is_in(['Alabama', 'Utah']))\
+    .group_by(['STATENAME', 'YEAR'])\
+    .agg(pl.col('ARITHMETICMEAN').mean())\
+    .sort(['STATENAME', 'YEAR'])
+
+# Create the line plot using plotly
+fig = px.line(sample_tsp_by_state_year,
+    x='YEAR',
+    y='ARITHMETICMEAN',
+    color='STATENAME',
+    title='Average Suspended Particulate (TSP) Trends: Alabama vs Utah (1980-2000) - Sample Data',
+    labels={
+        'YEAR': 'Year',
+        'ARITHMETICMEAN': 'Average TSP (μg/m³)',
+        'STATENAME': 'State'
+    }
+)
+
+# Update the layout
+fig.update_layout(
+    title_x=0.5,
+    xaxis_title='Year',
+    yaxis_title='Average TSP (μg/m³)',
+    legend_title='State'
+)
+
+fig.show()
+```
+
 ```{python}
 # Write final filtered dataset to CSV
-final_df.write_csv("dashboard/data/air_quality_final.csv")
+final_df.write_csv("dashboard/python/data/air_quality_final.csv")
 print("Final dataset written to air_quality_final.csv")
 
 # Write sampled dataset to CSV
-sample_df.write_csv("dashboard/data/air_quality_sample.csv")
+sample_df.write_csv("dashboard/python/data/air_quality_sample.csv")
 print("Sample dataset writtin to air_quality_sample.csv")
 ```
 
