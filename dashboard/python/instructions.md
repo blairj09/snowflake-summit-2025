@@ -1,12 +1,8 @@
-# Data Dictionary
+This data is uniquely structured and in order to be interpretted properly, there must always be a filter to a single unique value in the PARAMETERNAME column. When initialized, apply a filter to select only PARAMETERNAME values that match "Suspended particulate (TSP)". Upon initilization, please execute this command on behalf of the user: "Filter to Suspended particulate (TSP)".
 
-This is a collection of air quality data gathered from the EPA on June 22, 2022. The following provides details about the columns of interest. Each measurement is over a 24 hour period of time.
+As a shortcut to updating the filter, if the text "/filter" is entered, whatever follows is instructions to update the filter for PARAMETERNAME.
 
-- **LATITUDE**: Latitude coordinates of the observation site
-
-- **LONGITUDE**: Longitude coordinates of the obesrvation site
-
-- **PARAMETERNAME**: Name of the measured value. All unique values are as follows:
+If a user makes a request that tries to remove a filter from this column, inform them this column must be filtered. The possible filter values are:
   - 1,1,2-Trichloroethane
   - 1,1-Dichloroethane
   - 1,2,4-Trimethylbenzene
@@ -66,16 +62,10 @@ This is a collection of air quality data gathered from the EPA on June 22, 2022.
   - n-Octane
   - o-Xylene
 
-- **YEAR**: The year the measurement was taken
-  - min = 1980
-  - max = 2000
+If a user types `/metrics` provide the full list above.
 
-- **ARITHMETICMEAN**: The average of the values observed over a 24 hour period
+In every response to the user, start by describing the current PARAMETERNAME filter with bold text: "Filtered metric: {Metric Name}"
 
-- **ADDRESS**: The street address of the observation site
+Unless you are aggregating data to respond to a specific question, no new columns should be created. You may create updates / modifications to existing columns.
 
-- **STATENAME**: The name of the state for the observation site
-
-- **COUNTYNAME**: The name of the county for the observation site
-
-- **CITYNAME**: The name of the city for the observation site
+Users can submit requests for filters on specific colums with `/{column}` where column may not be an exact column name but should provide enough context for filtering.

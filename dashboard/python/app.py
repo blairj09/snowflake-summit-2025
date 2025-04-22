@@ -3,7 +3,7 @@ import polars as pl
 import plotly.express as px
 
 from pathlib import Path
-from shiny import App, render, ui
+from shiny import App, render, ui, reactive
 from shinywidgets import output_widget, render_widget
 from dotenv import load_dotenv
 from distutils.util import strtobool
@@ -27,6 +27,8 @@ with open(Path(__file__).parent / "greeting.md", "r") as f:
     greeting = f.read()
 with open(Path(__file__).parent / "data_description.md", "r") as f:
     data_desc = f.read()
+with open(Path(__file__).parent / "instructions.md", "r") as f:
+    instructions = f.read()
 
 def cortex_chat(system_prompt: str) -> chatlas.Chat:
     return chatlas.ChatSnowflake(
@@ -45,7 +47,8 @@ querychat_config = querychat.init(
     "data",
     greeting=greeting,
     data_description=data_desc,
-    create_chat_callback = anthropic_chat
+    create_chat_callback = anthropic_chat,
+    extra_instructions = instructions
 )
 
 # Additional data ----
@@ -107,7 +110,6 @@ app_ui = ui.page_sidebar(
         ),
         col_widths=[12, 12, 6, 6, 12]
     ),
-    
     title="US Air Quality",
     fillable=True
 )
@@ -115,12 +117,23 @@ app_ui = ui.page_sidebar(
 
 # Define server logic
 def server(input, output, session):
-    # 3. Initialize querychat server with the config from step 1
+    # Initialize querychat server with the config from step 1
     chat = querychat.server("chat", querychat_config)
+
+    # Create reactive value for dataframe
+    @reactive.calc
+    def df():
+        return pl.from_dataframe(chat["df"]())
+
+    def filter_name():
+        # We choose only the first value, assuming all values are the same.
+        # This assumption is accurate except for when the application is first initialized
+        return df().select("PARAMETERNAME").row(0)[0]
+
 
     @render_widget
     def plot_map():
-        data=pl.from_dataframe(chat["df"]())\
+        data=df()\
         .group_by("STATENAME")\
         .agg(pl.col("ARITHMETICMEAN").mean())\
         .with_columns(
@@ -134,7 +147,7 @@ def server(input, output, session):
             color='ARITHMETICMEAN',
             scope='usa',
             color_continuous_scale='Viridis',
-            title='Average Metric Levels by State',
+            title=f'Average {filter_name()} Levels by State',
             labels={'ARITHMETICMEAN': 'Average Metric'}
         )
 
@@ -142,7 +155,7 @@ def server(input, output, session):
 
     @render_widget
     def plot_line():
-        data = pl.from_dataframe(chat["df"]())\
+        data = df()\
             .group_by(["STATENAME", "YEAR"])\
             .agg(pl.col("ARITHMETICMEAN").mean())
 
@@ -151,7 +164,7 @@ def server(input, output, session):
             x='YEAR',
             y='ARITHMETICMEAN',
             color='STATENAME',
-            title='Average Metric Trends by State',
+            title=f'Average {filter_name()} Trends by State',
             labels={
                 'YEAR': 'Year',
                 'ARITHMETICMEAN': 'Average Metric',
@@ -166,9 +179,9 @@ def server(input, output, session):
     @render_widget
     def plot_hist():
         hist_output = px.histogram(
-            data_frame = chat["df"](),
+            data_frame = df(),
             x = "ARITHMETICMEAN",
-            title = "Metric Distribution"
+            title = f"{filter_name()} Distribution"
         )
 
         return hist_output
@@ -179,7 +192,7 @@ def server(input, output, session):
             data_frame=chat["df"](),
             x="90THPERCENTILE",
             y="10THPERCENTILE",
-            title="Percentile Comparison",
+            title=f"{filter_name()} Percentile Comparison",
             labels={
                 "ARITHMETICMEAN": "Measurement Value"
             },
