@@ -1,12 +1,15 @@
 import chatlas, querychat, snowflake.connector, os
 import polars as pl
 import plotly.express as px
+from querychat.datasource import SQLAlchemySource
 
 from pathlib import Path
 from shiny import App, render, ui, reactive
 from shinywidgets import output_widget, render_widget
 from dotenv import load_dotenv
 from distutils.util import strtobool
+from sqlalchemy import create_engine
+from snowflake.sqlalchemy import URL
 
 load_dotenv()
 
@@ -32,7 +35,9 @@ with open(Path(__file__).parent / "instructions.md", "r") as f:
 
 
 def cortex_chat(system_prompt: str) -> chatlas.Chat:
-    return chatlas.ChatSnowflake(model="claude-3-5-sonnet", system_prompt=system_prompt)
+    return chatlas.ChatSnowflake(
+        model="claude-3-5-sonnet", system_prompt=system_prompt
+    )
 
 
 def anthropic_chat(system_prompt: str) -> chatlas.Chat:
@@ -40,14 +45,22 @@ def anthropic_chat(system_prompt: str) -> chatlas.Chat:
         model="claude-3-5-sonnet-latest", system_prompt=system_prompt
     )
 
-
+account = os.getenv("SNOWFLAKE_ACCOUNT")
 querychat_config = querychat.init(
-    df,
-    "data",
+    SQLAlchemySource(
+        create_engine(URL(
+            account = account,
+            connection_name = "workbench",
+            database = "AIR_QUALITY_DATA_UNITED_STATES",
+            schema = "PUBLIC",
+            warehouse = "DEFAULT_WH",
+            role = "DEVELOPER"
+        )),
+    "AIR_QUALITY"),
     greeting=greeting,
     data_description=data_desc,
-    create_chat_callback=anthropic_chat,
     extra_instructions=instructions,
+    create_chat_callback=anthropic_chat
 )
 
 # Additional data ----
