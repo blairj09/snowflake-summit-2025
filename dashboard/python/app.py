@@ -63,14 +63,6 @@ querychat_config = querychat.init(
     create_chat_callback=anthropic_chat
 )
 
-# Additional data ----
-parameter_choices = (
-    df.group_by(pl.col("PARAMETERNAME"))
-    .agg(pl.len())
-    .sort("len", descending=True)["PARAMETERNAME"]
-    .to_list()
-)
-
 state_abbreviations = {
     "Alabama": "AL",
     "Alaska": "AK",
@@ -130,10 +122,7 @@ state_abbreviations = {
 app_ui = ui.page_sidebar(
     # Create sidebar chat
     querychat.sidebar(
-        "chat",
-        ui.input_select(
-            "parameter", "Air Quality Measurement", choices=parameter_choices
-        ),
+        "chat"
     ),
     # Main panel with data viewer and plots
     ui.layout_columns(
