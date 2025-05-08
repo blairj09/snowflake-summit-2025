@@ -1,8 +1,8 @@
 import chatlas, querychat, snowflake.connector, os
 import polars as pl
 import plotly.express as px
-from querychat.datasource import SQLAlchemySource
 
+from querychat.datasource import SQLAlchemySource
 from pathlib import Path
 from shiny import App, render, ui, reactive
 from shinywidgets import output_widget, render_widget
@@ -13,18 +13,6 @@ from snowflake.sqlalchemy import URL
 
 load_dotenv()
 
-# Dataset - Snowflake Air Quality Data ----
-
-snowflake_enabled = bool(strtobool(os.getenv("SNOWFLAKE", "False")))
-if snowflake_enabled:
-    conn = snowflake.connector.connect()
-    cur = conn.cursor()
-    cur.execute("select * from AIR_QUALITY_DATA_UNITED_STATES.PUBLIC.AIR_QUALITY")
-    df = cur.fetch_pandas_all()
-else:
-    data_path = Path(__file__).parent / "data" / "air_quality_sample.csv"
-    df = pl.read_csv(data_path)
-
 # querychat config ----
 with open(Path(__file__).parent / "greeting.md", "r") as f:
     greeting = f.read()
@@ -33,13 +21,6 @@ with open(Path(__file__).parent / "data_description.md", "r") as f:
 with open(Path(__file__).parent / "instructions.md", "r") as f:
     instructions = f.read()
 
-
-def cortex_chat(system_prompt: str) -> chatlas.Chat:
-    return chatlas.ChatSnowflake(
-        model="claude-3-5-sonnet", system_prompt=system_prompt
-    )
-
-
 def anthropic_chat(system_prompt: str) -> chatlas.Chat:
     return chatlas.ChatAnthropic(
         model="claude-3-5-sonnet-latest", system_prompt=system_prompt
@@ -47,22 +28,25 @@ def anthropic_chat(system_prompt: str) -> chatlas.Chat:
 
 account = os.getenv("SNOWFLAKE_ACCOUNT")
 querychat_config = querychat.init(
+    # Snowflake connection
     SQLAlchemySource(
         create_engine(URL(
             account = account,
+            # connection_name comes from the config file created automatically by Posit Workbench
             connection_name = "workbench",
-            database = "AIR_QUALITY_DATA_UNITED_STATES",
+            database = "DEMOS",
             schema = "PUBLIC",
             warehouse = "DEFAULT_WH",
             role = "DEVELOPER"
         )),
-    "AIR_QUALITY"),
+    "AIR_QUALITY_FILTERED"),
     greeting=greeting,
     data_description=data_desc,
     extra_instructions=instructions,
     create_chat_callback=anthropic_chat
 )
 
+# Suplemental data ----
 state_abbreviations = {
     "Alabama": "AL",
     "Alaska": "AK",
@@ -127,16 +111,40 @@ app_ui = ui.page_sidebar(
     # Main panel with data viewer and plots
     ui.layout_columns(
         # Row 1
-        ui.card(ui.output_text("filtered_metric"), fill=True),
+        ui.card(
+            ui.card_header("Current Filter"), 
+            ui.output_text("filtered_metric"), 
+            fill=True
+        ),
         # Row 2
-        ui.card(output_widget("plot_map"), fill=True),
+        ui.card(
+            ui.card_header("Geographic Distribution"), 
+            output_widget("plot_map"), 
+            fill=True
+        ),
         # Row 3
-        ui.card(output_widget("plot_line"), fill=True),
+        ui.card(
+            ui.card_header("Temporal Trends"), 
+            output_widget("plot_line"), 
+            fill=True
+        ),
         # Row 4
-        ui.card(output_widget("plot_hist"), fill=True),
-        ui.card(output_widget("plot_scatter"), fill=True),
+        ui.card(
+            ui.card_header("Distribution"), 
+            output_widget("plot_hist"), 
+            fill=True
+        ),
+        ui.card(
+            ui.card_header("Percentile Analysis"), 
+            output_widget("plot_scatter"), 
+            fill=True
+        ),
         # Row 5
-        ui.card(ui.output_data_frame("data_table"), fill=True),
+        ui.card(
+            ui.card_header("Raw Data"), 
+            ui.output_data_frame("data_table"), 
+            fill=True
+        ),
         col_widths=[12, 12, 6, 6, 12],
     ),
     title="US Air Quality",
@@ -146,44 +154,45 @@ app_ui = ui.page_sidebar(
 
 # Define server logic
 def server(input, output, session):
-    # Initialize querychat server with the config from step 1
+    # Initialize querychat server with the config
     chat = querychat.server("chat", querychat_config)
 
     # Create reactive value for dataframe
     @reactive.calc
     def df():
-        return pl.from_dataframe(chat["df"]())
+        df_pl = pl.from_dataframe(chat["df"]())
+        return df_pl
 
     @reactive.calc
     def filter_name():
         # We choose only the first value, assuming all values are the same.
         # This assumption is accurate except for when the application is first initialized
-        return df().select("PARAMETERNAME").row(0)[0]
+        return df().select("parametername").row(0)[0]
 
     @render.text
     def filtered_metric():
-        return f"Applied Filter: {filter_name()}"
+        return filter_name()
 
     @render_widget
     def plot_map():
         data = (
             df()
-            .group_by("STATENAME")
-            .agg(pl.col("ARITHMETICMEAN").mean())
+            .group_by("statename")
+            .agg(pl.col("arithmeticmean").mean())
             .with_columns(
-                pl.col("STATENAME").replace(state_abbreviations).alias("STATEABB")
+                pl.col("statename").replace(state_abbreviations).alias("stateabb")
             )
         )
 
         map_output = px.choropleth(
             data,
-            locations="STATEABB",
+            locations="stateabb",
             locationmode="USA-states",
-            color="ARITHMETICMEAN",
+            color="arithmeticmean",
             scope="usa",
             color_continuous_scale="Viridis",
             title=f"Average {filter_name()} Levels by State",
-            labels={"ARITHMETICMEAN": ""},
+            labels={"arithmeticmean": ""},
         )
 
         return map_output
@@ -192,21 +201,21 @@ def server(input, output, session):
     def plot_line():
         data = (
             df()
-            .group_by(["STATENAME", "YEAR"])
-            .agg(pl.col("ARITHMETICMEAN").mean())
-            .sort(["STATENAME", "YEAR"])
+            .group_by(["statename", "year"])
+            .agg(pl.col("arithmeticmean").mean())
+            .sort(["statename", "year"])
         )
 
         line_output = px.line(
             data,
-            x="YEAR",
-            y="ARITHMETICMEAN",
-            color="STATENAME",
+            x="year",
+            y="arithmeticmean",
+            color="statename",
             title=f"Average {filter_name()} Trends by State",
             labels={
-                "YEAR": "Year",
-                "ARITHMETICMEAN": "Average Metric",
-                "STATENAME": "State",
+                "year": "Year",
+                "arithmeticmean": "Average Metric",
+                "statename": "State",
             },
         ).update_layout(showlegend=False)
 
@@ -215,7 +224,7 @@ def server(input, output, session):
     @render_widget
     def plot_hist():
         hist_output = px.histogram(
-            data_frame=df(), x="ARITHMETICMEAN", title=f"{filter_name()} Distribution"
+            data_frame=df(), x="arithmeticmean", title=f"{filter_name()} Distribution"
         )
 
         return hist_output
@@ -227,8 +236,8 @@ def server(input, output, session):
             x="90THPERCENTILE",
             y="10THPERCENTILE",
             title=f"{filter_name()} Percentile Comparison",
-            labels={"ARITHMETICMEAN": "Measurement Value"},
-            color="PARAMETERNAME",
+            labels={"arithmeticmean": "Measurement Value"},
+            color="parametername",
         ).update_layout(showlegend=False)
 
         return scatter_output
