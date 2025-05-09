@@ -4,12 +4,13 @@ import plotly.express as px
 
 from querychat.datasource import SQLAlchemySource
 from pathlib import Path
-from shiny import App, render, ui, reactive
+from shiny import App, render, ui, reactive, session
 from shinywidgets import output_widget, render_widget
 from dotenv import load_dotenv
-from distutils.util import strtobool
 from sqlalchemy import create_engine
 from snowflake.sqlalchemy import URL
+from posit.connect import Client
+
 
 load_dotenv()
 
@@ -27,24 +28,40 @@ def anthropic_chat(system_prompt: str) -> chatlas.Chat:
     )
 
 account = os.getenv("SNOWFLAKE_ACCOUNT")
-querychat_config = querychat.init(
-    # Snowflake connection
-    SQLAlchemySource(
+# Configure OAuth within Posit Connect
+if os.getenv("RSTUDIO_PRODUCT") == "CONNECT":
+    user_session_token = session.http_conn.headers.get("Posit-Connect-User-Session-Token")
+    oauth_token = Client().oauth.get_credentials(user_session_token).get("access_token")
+
+    snowflake_connection = SQLAlchemySource(
         create_engine(URL(
             account = account,
-            # connection_name comes from the config file created automatically by Posit Workbench
-            connection_name = "workbench",
+            token = oauth_token,
+            authenticator = "oauth",
             database = "DEMOS",
             schema = "PUBLIC",
             warehouse = "DEFAULT_WH",
-            role = "DEVELOPER"
         )),
-    "AIR_QUALITY_FILTERED"),
-    greeting=greeting,
-    data_description=data_desc,
-    extra_instructions=instructions,
-    create_chat_callback=anthropic_chat
-)
+    "AIR_QUALITY_FILTERED")
+else:
+    querychat_config = querychat.init(
+        # Snowflake connection
+        SQLAlchemySource(
+            create_engine(URL(
+                account = account,
+                # connection_name comes from the config file created automatically by Posit Workbench
+                connection_name = "workbench",
+                database = "DEMOS",
+                schema = "PUBLIC",
+                warehouse = "DEFAULT_WH",
+                role = "DEVELOPER"
+            )),
+        "AIR_QUALITY_FILTERED"),
+        greeting=greeting,
+        data_description=data_desc,
+        extra_instructions=instructions,
+        create_chat_callback=anthropic_chat
+    )
 
 # Suplemental data ----
 state_abbreviations = {
