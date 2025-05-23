@@ -4,6 +4,7 @@
 .Ruserdata
 .venv
 .env
+.Renviron
 air_quality_final.csv
 air_quality.csv
 README_files/
