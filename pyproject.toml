@@ -1,0 +1,23 @@
+[project]
+name = "snowflake-summit-2025"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "chatlas>=0.7.1",
+    "matplotlib>=3.10.3",
+    "pandas>=2.2.3",
+    "plotly>=6.1.1",
+    "querychat",
+    "scipy>=1.15.3",
+    "shiny>=1.4.0",
+    "shinywidgets>=0.6.2",
+    "snowflake-ml-python>=1.8.4",
+    "snowflake-sqlalchemy>=1.7.3",
+    "sqlalchemy>=2.0.41",
+]
+
+[tool.uv.sources]
+querychat = { git = "https://github.com/posit-dev/querychat.git", subdirectory = "python-package", rev = "refs/pull/5/head" }
+chatlas = { git = "https://github.com/posit-dev/chatlas.git", rev = "snowflake-tool-calling2" }
