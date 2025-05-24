@@ -12,6 +12,9 @@ import querychat
 import re
 from scipy import stats
 import numpy as np
+from sqlalchemy import create_engine
+from querychat.datasource import SQLAlchemySource
+from snowflake.sqlalchemy import URL
 
 
 matplotlib.use("Agg")  # Use Agg backend for matplotlib
@@ -20,14 +23,38 @@ matplotlib.use("Agg")  # Use Agg backend for matplotlib
 plt.style.use("ggplot")
 
 # Load data
-data_path = Path(__file__).parent / os.path.join("data", "stages.csv")
-stages = pd.read_csv(data_path)
+# data_path = Path(__file__).parent / os.path.join("data", "stages.csv")
+# stages = pd.read_csv(data_path)
 
-
+# Querychat configuration
 with open(Path(__file__).parent / "greeting.md", "r") as f:
     greeting = f.read()
 with open(Path(__file__).parent / "data_description.md", "r") as f:
     data_desc = f.read()
+
+def cortex_chat(system_prompt: str) -> chatlas.Chat:
+    return chatlas.ChatSnowflake(model="claude-3-5-sonnet", system_prompt=system_prompt)
+
+account = os.getenv("SNOWFLAKE_ACCOUNT")
+querychat_config = querychat.init(
+    SQLAlchemySource(
+        create_engine(
+            URL(
+                account = account,
+                # connection_name comes from the config file created automatically by Posit Workbench
+                connection_name = "workbench",
+                database = "DEMOS",
+                schema = "PUBLIC",
+                warehouse = "DEFAULT_WH",
+                role = "DEVELOPER"
+            )
+        ),
+        "stages"
+    ),
+    greeting=greeting,
+    data_description=data_desc,
+    create_chat_callback = cortex_chat
+)
 
 
 # Create UI
@@ -79,13 +106,6 @@ app_ui = ui.page_sidebar(
 
 # Define server
 def server(input, output, session):
-    querychat_config = querychat.init(
-        stages,
-        "stages",
-        greeting=greeting,
-        data_description=data_desc,
-    )
-
     # Initialize querychat server object
     chat = querychat.server("chat", querychat_config)
 
