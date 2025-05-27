@@ -1,27 +1,66 @@
-# Snowflake Summit Demo - Air Quality Analysis
+# Next-Gen Data Science
+## Redefining Data Sciencce with Posit and Snowflake
 
-## Overview
-This project analyzes historical air quality data across United States avaialable via the [Snowflake marketplace](https://app.snowflake.com/marketplace/listing/GZSTZL7M0KK/snowflake-virtual-hands-on-labs-air-quality-data-united-states?lang=j), focusing on various pollutants and atmospheric parameters. The purpose is to highlight the use of `querychat` as an innovative and intuitive way to interact safely with SQL powered dashboards using natural language. Ultimately, the expectation is that `querychat` enables the following workflow:
-  - A user connects to the dashboard and begins submitting natural language requests to the chat interface
-  - The chat interface itself is powered by Claude 3.5 via Snowflake Cortex
-  - The result of a chat interaction is SQL that is executed against a Snowflake table to filter the data based on the natural language query
-  - The dashboard updates to reflect the filtered data
+This repository contains slides and examples used at a [talk](https://reg.snowflake.com/flow/snowflake/summit25/sessions/page/catalog/session/1740789935873001N0BU) given at Snowflake Summit in June 2025.
 
-This sort of workflow enables natural language interaction with data **without** requiring a foundational LLM to interpret raw data. Instead, the LLM is only used for creating SQL to respond to filtering and aggregation reguests. The SQL is auditable and, most importantly, does not require the LLM to be exposed to any of the actual data. Once the data has been filtered, the rest of the dashboard reflects the filtered data. Effectively, many UI controls can be replaced with a single chat panel.
+![Tour de France Dashboard Screenshot](img/r-dashboard-screenshot.png)
 
-![](img/dashboard-screenshot.png)
+There are two example Shiny dashboards in this repository: [`app.R`](app.R) and
+[`app.py`](app.py). As suggested by their names, they are nearly identical
+dashboards, one written in R and the other in Python. Both dashboards are
+designed to analyze the Tour de France stages dataset that was provided as part
+of the [TidyTuesday
+challenge](https://github.com/rfordatascience/tidytuesday/blob/main/data/2020/2020-04-07/readme.md).
 
-**In this specific example, both the underlying LLM and the SQL execution are powered by Snowflake.**
+### Snowflake Native Apps
+Posit Workbench (and soon Posit Connect and Posit Package Manager) are available
+ in Snowflake through Native Apps. This makes it easy to run Posit commercial 
+ tools directly in your Snowflake account on Snowflake managed infrastucture 
+ (via Snowpark Container Services (SPCS)). These examples and the accompanying 
+ talk were exclusively built using this Native App implementation.
 
-## Data Description
-The data includes aggregations of observed air quality measurements from various observations sites across the United States from 1980-2000. The dataset includes many features, but the main feature is `PARAMETERNAME`, which contains unique parameters measured including:
-  - Total Suspended Particles (TSP)
-  - Various metals in TSP (Lead, Chromium, Arsenic, etc.)
-  - PM10 measurements
-  - Volatile Organic Compounds (Benzene, Toluene, etc.)
-  - Atmospheric conditions (Temperature, Pressure)
+### Positron for Data Analysis and App Development
+Positron is a next-generation data science IDE from Posit. It provides many of
+the features of RStudio, but in a more modern and flexible environment. It is
+designed to help data scientists and developers carefully analyze data and then
+build, deploy, and manage data-driven applications with ease. Positron was used
+extensively in the development of this example and demonstrated in the
+accompanying talk.
 
-These values were measured over a 24 period of time and then columns like `ARITHMETICMEAN` contain the average value of the resulting data collection. The data is not very granular and specific dates of collection are not included, but this still provides a valid base for rudimentary analysis of air quality by location and over 
+### GenAI Assisted Development
+Positron includes "Positron Assistant", which is a GenAI-powered assistant that
+can help you write code, debug, and analyze data. In this example, the
+assistant was used to generate the initial code for the dashboard and to
+provide suggestions for improving the analysis. The assistant was also used to
+generate the README file and other documentation for the project.
 
-## Dashboard
-Eventually, two dashboards will be included in this repository: one writted in Shiny for R, the other in Shiny for Python. For now, a single dashbard writtin in Shiny for Python is found at [`dashboard/python/app.py`](dashboard/python/app.py). A virtualenvironment is created using the modules described in [`requirements.txt`](requirements.txt).
+### App Development
+Positron makes it easy to develop interactive applications using popular
+frameworks in both Python and R. The two example apps here were created in
+`shiny` and developed with the help of the Shiny Assistant, which is accessible
+via Positron Assistant using `@shiny`. The assistant can help you create UI
+components, server logic, and even generate sample data for testing your app.
+The app is designed to be interactive and allows users to filter and analyze
+the Tour de France dataset in various ways.
+
+### Accessing Databricks Foundational Models
+The app uses Claude 3.5 Sonnet via Cortex in order to convert natural
+language queries into SQL filters. This is done via the [`querychat`
+package](https://github.com/posit-dev/querychat) for both Python and R. The
+only user input to the app is the natural language query, which is then
+converted into SQL and run against the dataset. The results are displayed in
+the app, allowing users to explore the data in a more intuitive and flexible
+way.
+
+### Deployment
+The applications can be deployed to Posit Connect. Once deployed, these apps 
+can be shared with others.
+
+### OAuth Support
+Posit Workbench and Posit Connect both support Snowflake OAuth. This
+dramatically simplifies the process of connecting to Snowflake from Posit.
+Developers using Posit Workbench can sign into their Databricks workspace when
+they start a session and then any tool that interacts with Databricks (e.g.,
+`querychat`) will automatically use the OAuth token for authentication. Once
+deployed to Posit Connect, these apps use OAuth tokens available within Posit
+Connect to securely connect to Databricks.
