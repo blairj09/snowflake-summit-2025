@@ -9,6 +9,7 @@ dependencies = [
     "matplotlib>=3.10.3",
     "pandas>=2.2.3",
     "plotly>=6.1.1",
+    "posit-sdk>=0.10.0",
     "querychat",
     "scipy>=1.15.3",
     "shiny>=1.4.0",
