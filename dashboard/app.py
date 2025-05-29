@@ -15,6 +15,9 @@ import numpy as np
 from sqlalchemy import create_engine
 from querychat.datasource import SQLAlchemySource
 from snowflake.sqlalchemy import URL
+from posit.connect import Client
+from posit.connect.external.snowflake import PositAuthenticator
+import snowflake.connector
 
 
 matplotlib.use("Agg")  # Use Agg backend for matplotlib
@@ -31,31 +34,6 @@ with open(Path(__file__).parent / "greeting.md", "r") as f:
     greeting = f.read()
 with open(Path(__file__).parent / "data_description.md", "r") as f:
     data_desc = f.read()
-
-def cortex_chat(system_prompt: str) -> chatlas.Chat:
-    return chatlas.ChatSnowflake(model="claude-3-5-sonnet", system_prompt=system_prompt)
-
-account = os.getenv("SNOWFLAKE_ACCOUNT")
-querychat_config = querychat.init(
-    SQLAlchemySource(
-        create_engine(
-            URL(
-                account = account,
-                # connection_name comes from the config file created automatically by Posit Workbench
-                connection_name = "workbench",
-                database = "DEMOS",
-                schema = "PUBLIC",
-                warehouse = "DEFAULT_WH",
-                role = "DEVELOPER"
-            )
-        ),
-        "stages"
-    ),
-    greeting=greeting,
-    data_description=data_desc,
-    create_chat_callback = cortex_chat
-)
-
 
 # Create UI
 app_ui = ui.page_sidebar(
@@ -106,6 +84,49 @@ app_ui = ui.page_sidebar(
 
 # Define server
 def server(input, output, session):
+    session_token = session.http_conn.headers.get("Posit-Connect-User-Session-Token")
+
+    auth = PositAuthenticator(
+        local_authenticator="EXTERNALBROWSER",
+        user_session_token=session_token,
+    )
+
+
+    def get_connection():
+        return snowflake.connector.connect(
+            account="duloftf-posit-software-pbc-dev",
+            authenticator=auth.authenticator,
+            token=auth.token,
+            warehouse="DEFAULT_WH",
+            database="DEMOS",
+            schema="PUBLIC",
+        )
+
+    snowflake_connection = querychat.datasource.SQLAlchemySource(
+        create_engine("snowflake://not@used/db", creator=get_connection),
+        "stages",
+    )
+
+    # create chatlas connection
+    def snowflake_claude(system_prompt: str) -> chatlas.Chat:
+        return chatlas.ChatSnowflake(
+            model="claude-3-5-sonnet",
+            system_prompt=system_prompt,
+            account="duloftf-posit-software-pbc-dev",
+            kwargs={
+                "authenticator": auth.authenticator,
+                "token": auth.token,
+            },
+        )
+
+    querychat_config = querychat.init(
+        # Snowflake connection
+        snowflake_connection,
+        greeting=greeting,
+        data_description=data_desc,
+        create_chat_callback=snowflake_claude,
+    )
+
     # Initialize querychat server object
     chat = querychat.server("chat", querychat_config)
 
