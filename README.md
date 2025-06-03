@@ -31,11 +31,12 @@ applications with ease. Positron was used extensively in the development of this
 example and demonstrated in the accompanying talk.
 
 ### GenAI Assisted Development
-Positron includes "Positron Assistant", which is a GenAI-powered assistant that
-can help you write code, debug, and analyze data. In this example, the
-assistant was used to generate the initial code for the dashboard and to
-provide suggestions for improving the analysis. The assistant was also used to
-generate the README file and other documentation for the project.
+Positron includes [Positron
+Assistant](https://positron.posit.co/assistant.html), which is a GenAI-powered
+assistant that can help you write code, debug, and analyze data. In this
+example, the assistant was used to generate the initial code for the dashboard
+and to provide suggestions for improving the analysis. The assistant was also
+used to generate the README file and other documentation for the project.
 
 ### App Development
 Positron makes it easy to develop interactive applications using popular
