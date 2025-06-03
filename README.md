@@ -1,7 +1,8 @@
 # Next-Gen Data Science
 ## Redefining Data Science with Posit and Snowflake
 
-This repository contains slides and examples used at a
+This repository contains [slides](slides/slides.pdf) and [examples](dashboard/)
+used at a
 [talk](https://reg.snowflake.com/flow/snowflake/summit25/sessions/page/catalog/session/1740789935873001N0BU)
 given at Snowflake Summit in June 2025.
 
